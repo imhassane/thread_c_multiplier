@@ -18,171 +18,107 @@
 #include "func.h"
 #include "helper.h"
 
+void get_data(product_informations_t *);
+void free_product_informations(product_informations_t *);
+
 file_reader_result_t * get_values_from_array(char *, int);
 
 int main(int argc,char ** argv)
 {
-    size_t i, iter;
-    pthread_t *multTh;
-    size_t    *multData;
-    pthread_t  addTh;
-    void      *threadReturnValue;
+    
+    product_informations_t p_informations;
 
-    cpu_set_t ensemble;
-    size_t coeur;
-    size_t modulo;
-    char *pointeur;
-    char name[200];
+    get_data(&p_informations);
 
-    file_reader_result_t * file_reader_result = NULL;
-
-    int fd = open("./test_file.txt", O_RDONLY, S_IRUSR | S_IWUSR);
-    struct stat sb;
-
-    if(fstat(fd, &sb) == -1) {
-        perror("couldn't get file size");
-        exit(1);
-    }
-    // On créé un bloc ayant pour taille la taille du fichier.
-    char *file_in_memory = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-
-    // On matche les valeurs du tableau au file_reader_result.
-    file_reader_result = get_values_from_array(file_in_memory, sb.st_size);
+    free_product_informations(&p_informations);
 
     
-
-    /* A cause de warnings lorsque le code n'est pas encore la...*/
-    (void)addTh; (void)threadReturnValue;
-
-
-    CPU_ZERO(&ensemble);
-    coeur = sysconf(_SC_NPROCESSORS_ONLN);
-    modulo = prod.size % coeur;
-
-    for (int i = modulo; i < coeur; i++)
-    {
-        CPU_SET(i,&ensemble);
-    }
-    sched_setaffinity(0, sizeof(cpu_set_t), &ensemble);
-
-    printf("CPU : %d --> main\n", sched_getcpu());
-
-
-    /* Initialisations (Product, tableaux, generateur aleatoire,etc) */
-
-    prod.nbIterations = file_reader_result->nb_iterations;
-    prod.size = file_reader_result->taille_vecteurs;
-    prod.v3 = malloc(sizeof * prod.v3 * prod.size);
-
-    prod.state=STATE_WAIT;
-
-    prod.pendingMult=(int *)malloc(prod.size*sizeof(int));
-
-    /*=>initialiser prod.mutex ... */
-    pthread_mutex_init(&(prod.mutex), NULL);
-
-    /*=>initialiser prod.cond ...  */
-    pthread_cond_init(&(prod.cond), NULL);
-
-
-    /* Allocation dynamique du tableau pour les threads multiplieurs */
-
-    multTh = (pthread_t *) malloc(prod.size * sizeof * multTh);
-
-    /* Allocation dynamique du tableau des mulData */
-
-    multData= (size_t *) malloc(prod.size * sizeof * multData);
-
-    /* Initialisation du tableau des MulData */
-
-    for(i=0;i<prod.size;i++)
-    {
-        multData[i]=i;
-    }
-
-    /*=>Creer les threads de multiplication... */
-    for(i=0;i<prod.size;i++)
-    {
-        if(pthread_create(&multTh[i], NULL, mult, (void * restrict) i) != 0)
-        {
-            perror("create mult");
-            exit(1);
-        }
-    }
-
-    /*=>Creer le thread d'addition...          */
-    if(pthread_create(&addTh, NULL, add, NULL) != 0)
-    {
-        perror("create add");
-        exit(1);
-    }
-
-    srand(time((time_t *)0));
-
-    for(iter=0;iter<prod.nbIterations * 2;iter+=2)
-    {  
-        prod.v1 = file_reader_result->vecteurs[iter];
-        prod.v2 = file_reader_result->vecteurs[iter];
-
-        /*=>Autoriser le demarrage des multiplications pour une nouvelle iteration..*/
-        pthread_mutex_lock(&(prod.mutex));
-        initPendingMult(&prod);
-
-        prod.state=STATE_MULT;
-        
-        pthread_cond_broadcast(&(prod.cond));
-        pthread_mutex_unlock(&(prod.mutex));
-
-        /*=>Attendre l'autorisation d'affichage...*/
-        pthread_mutex_lock(&(prod.mutex));
-            while(prod.state != STATE_PRINT)
-            {
-                pthread_cond_wait(&(prod.cond), &(prod.mutex));
-            }
-        pthread_mutex_unlock(&(prod.mutex));
-
-        /*=>Afficher le resultat de l'iteration courante...*/
-        printf("N° Itération: %ld -- Résultat = %lg\n",iter,prod.result);
-
-    }
-
-    /*=>Attendre la fin des threads de multiplication...*/
-    for(i=0;i<prod.size;i++)
-    {
-        if (pthread_join(multTh[i], NULL) != 0)
-        {
-            perror("join");
-            exit(1);
-        }
-    }
-
-    /*=>Attendre la fin du thread d'addition...*/
-    if (pthread_join(addTh, NULL) != 0)
-    {
-        perror("join");
-        exit(1);
-    }
-
-    /*=> detruire prod.cond ... */
-    pthread_cond_destroy(&(prod.cond));
-
-    /*=> detruire prod.mutex ... */
-    pthread_mutex_destroy(&(prod.mutex));
-
-    /* Detruire avec free ce qui a ete initialise avec malloc */
-
-
-    munmap(file_in_memory, sb.st_size);
-    for(int i = 0, l = file_reader_result->nb_iterations * 2; i < l; i++) {
-        free(file_reader_result->vecteurs[i]);
-    }
-    free(prod.pendingMult);
-    free(prod.v3);
-    free(multTh);
-    free(multData);
-    free(file_reader_result->vecteurs);
-    free(file_reader_result);
     return(EXIT_SUCCESS);
+}
+
+void get_data(product_informations_t * p_infos) {
+    int nb_mult = 1,
+        i = 0, j = 0, k = 0,
+        n_lin = 0, n_col = 0,
+        value = 0;
+    puts("Entrez le nombre de multiplications a effectuer");
+    scanf("%d", &nb_mult);
+    // On entre le nombre de multiplications à éffectuer
+    p_infos->nb_mult = nb_mult;
+    p_infos->matrices = malloc(sizeof * p_infos->matrices * nb_mult);
+
+    // On entre les matrices
+    matrice_t * mat = NULL;
+
+    while(nb_mult > 0) {
+        puts("---- Informations de la matrice 1 -------");
+        puts("\tNombre de ligne :)");
+        scanf("%d", &n_lin);
+
+        puts("\tNombre de colonnes :)");
+        scanf("%d", &n_col);
+        // On créé une nouvelle matrice
+        mat = malloc(sizeof * mat);
+        mat->nb_lignes = n_lin;
+        mat->nb_colonnes = n_col;
+        mat->vecteurs = malloc(sizeof * mat->vecteurs * n_lin);
+
+        // On entre les valeurs des vecteurs de la matrice.
+        for(j=0; j<n_lin; j++){
+            printf("\tVecteur n°%d de la matrice:\n", j);
+            mat->vecteurs[j] = malloc(sizeof * mat->vecteurs[j] * mat->nb_colonnes);
+
+            for(k=0; k<n_col; k++){
+                printf("Entrez mat[%d][%d]: ", j, k);
+                scanf("%d", &value);
+                mat->vecteurs[j][k] = value;
+            }
+        }
+
+        // On l'ajoute dans la liste des matrices.
+        p_infos->matrices[i] = mat;
+        i++;
+
+        puts("---- Informations de la matrice 2 -------");
+        puts("\tNombre de ligne :)");
+        scanf("%d", &n_lin);
+
+        puts("\tNombre de colonnes :)");
+        scanf("%d", &n_col);
+        // On créé une nouvelle matrice
+        mat = malloc(sizeof * mat);
+        mat->nb_lignes = n_lin;
+        mat->nb_colonnes = n_col;
+        mat->vecteurs = malloc(sizeof * mat->vecteurs * n_lin);
+
+        // On entre les valeurs des vecteurs de la matrice.
+        for(j=0; j<n_lin; j++){
+            printf("\tVecteur n°%d de la matrice:\n", j);
+            mat->vecteurs[j] = malloc(sizeof * mat->vecteurs[j] * mat->nb_colonnes);
+
+            for(k=0; k<n_col; k++){
+                printf("Entrez mat[%d][%d]: ", j, k);
+                scanf("%d", &value);
+                mat->vecteurs[j][k] = value;
+            }
+        }
+        
+        // On l'ajoute dans la liste des matrices.
+        p_infos->matrices[i] = mat;
+        i++;
+        nb_mult--;
+    }
+}
+
+void free_product_informations(product_informations_t * p_infos) {
+    int i, j;
+    for(i=0; i<p_infos->nb_mult; i++) {
+        for(j=0; j<p_infos->nb_mult*2; j++){
+            free(p_infos->matrices[j]->vecteurs);
+            free(p_infos->matrices[j]);
+        }
+        free(p_infos->matrices[i]);
+    }
 }
 
 file_reader_result_t * get_values_from_array(char * content, int size) {
@@ -252,3 +188,28 @@ file_reader_result_t * get_values_from_array(char * content, int size) {
 
     return result;
 }
+
+/*
+file_reader_result_t * file_reader_result = NULL;
+
+    int fd = open("./test_file.txt", O_RDONLY, S_IRUSR | S_IWUSR);
+    struct stat sb;
+
+    if(fstat(fd, &sb) == -1) {
+        perror("couldn't get file size");
+        exit(1);
+    }
+    // On créé un bloc ayant pour taille la taille du fichier.
+    char *file_in_memory = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+
+    // On matche les valeurs du tableau au file_reader_result.
+    file_reader_result = get_values_from_array(file_in_memory, sb.st_size);
+
+
+    munmap(file_in_memory, sb.st_size);
+    for(int i = 0, l = file_reader_result->nb_iterations * 2; i < l; i++) {
+        free(file_reader_result->vecteurs[i]);
+    }
+    free(file_reader_result->vecteurs);
+    free(file_reader_result);
+    */
