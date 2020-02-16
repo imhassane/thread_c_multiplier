@@ -5,7 +5,7 @@
 typedef struct {
     int nb_iterations;
     int taille_vecteurs;
-    int ** vecteurs;
+    double ** vecteurs;
 } file_reader_result_t;
 
 #endif
