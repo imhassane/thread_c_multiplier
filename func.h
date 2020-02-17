@@ -13,6 +13,8 @@
 #include <unistd.h>
 #include <sys/types.h>
 
+#include "my_types.h"
+
 typedef enum
   {
   STATE_WAIT,
@@ -29,9 +31,9 @@ typedef struct
   pthread_mutex_t mutex;
   size_t nbIterations;
   size_t size;
-  double * v1;
-  double * v2;
-  double * v3;
+  matrice_t * mat_1;
+  matrice_t * mat_2;
+  matrice_t * mat_result;
   double result;
 } Product;
 
