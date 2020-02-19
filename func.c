@@ -61,7 +61,7 @@ void * mult(void * data)
 			prod.pendingMult[params->id] = 0;
 			if(nbPendingMult(&prod)==0)
 			{
-				prod.state = STATE_PRINT;
+				prod.state = STATE_SAVE;
 				pthread_cond_broadcast(&(prod.cond));
 			}
 		pthread_mutex_unlock(&(prod.mutex));

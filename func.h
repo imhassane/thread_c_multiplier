@@ -20,6 +20,7 @@ typedef enum
   STATE_WAIT,
   STATE_MULT,
   STATE_ADD,
+  STATE_SAVE,
   STATE_PRINT
   } State;
 

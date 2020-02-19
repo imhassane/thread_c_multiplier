@@ -20,10 +20,12 @@
 #include "helper.h"
 
 char FILE_ADRESS[] = "./matrices_test_save.txt";
+char USER_FILE[268];
 
 void get_product_informations_data(product_informations_t *);
 void get_product_informations_from_file(product_informations_t *, char *, int);
 void save_product_informations_data(product_informations_t *, int);
+void save_matrix(matrice_t *, int);
 void free_product_informations(product_informations_t *);
 
 file_reader_result_t * get_values_from_array(char *, int);
@@ -46,17 +48,38 @@ int main(int argc,char ** argv)
                 . On initialise un thread qui va calculer le coefficient.
             
     */
-    
+
+
     product_informations_t p_informations;
+
+    // pour creer une matrice depuis l'entrée standard
+    // il faut utiliser la fonction "get_product_informations_data"
+
+    if(argc < 3) {
+        puts("Le programme prend en parametres un fichier contenant les matrices et un autre qui va contenir le resultat de calcul des matrices");
+        puts("[usage]: ./prog input_file output_file")
+        exit(1);
+    }
+
+    strcpy(USER_FILE, argv[1]);
+    
     int fd = open(FILE_ADRESS, O_RDWR, S_IRUSR | S_IWUSR);
-    struct stat sb;
+    int ufd = open(USER_FILE, O_RDWR, S_IRUSR | S_IWUSR);
+
+    struct stat sb, usb;
 
     if(fstat(fd, &sb) == -1) {
         perror("couldn't get file size");
         exit(1);
     }
 
+    if(fstat(ufd, &usb) == -1) {
+        perror("couldn't get user file");
+        exit(1);
+    }
+
     char *file_in_memory = mmap(NULL, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    char *ufile_in_memory = mmap(NULL, usb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, ufd, 0);
 
     // Initialisation de prod.mutex
     pthread_mutex_init(&(prod.mutex), NULL);
@@ -141,6 +164,21 @@ int main(int argc,char ** argv)
                 prod.state = STATE_MULT;
 
                 pthread_cond_broadcast(&(prod.cond));
+                pthread_mutex_unlock(&(prod.mutex));
+
+                // Gestion de l'affichage
+                pthread_mutex_lock(&(prod.mutex));
+                    while(prod.state != STATE_SAVE)
+                    {
+                        pthread_cond_wait(&(prod.cond), &(prod.mutex));
+                    }
+                pthread_mutex_unlock(&(prod.mutex));
+                save_matrix(prod.mat_result, ufd);
+                puts("Enregistrement termine");
+
+                pthread_mutex_lock(&(prod.mutex));
+                    prod.state = STATE_PRINT;
+                    pthread_cond_broadcast(&(prod.cond));
                 pthread_mutex_unlock(&(prod.mutex));
 
                 // Gestion de l'affichage
@@ -395,6 +433,24 @@ void save_product_informations_data(product_informations_t * p_infos, int fd) {
 
 }
 
+void save_matrix(matrice_t * mat, int fd) {
+    char map[268];
+    int index = 0;
+    for(int i=0; i<mat->nb_lignes; i++){
+        for(int j=0; j<mat->nb_colonnes; j++) {
+            get_char_from_int(map, (int) mat->vecteurs[i][j], &index);
+            if(j != mat->nb_colonnes-1)
+                map[index++] = ' ';
+        }
+        map[index++] = '\n';
+    }
+    map[index++] = '\0';
+    if(write(fd, map, strlen(map)) == -1) {
+        perror("writing matrix");
+        exit(1);
+    }
+}
+
 void free_product_informations(product_informations_t * p_infos) {
     int i, j;
     for(i=0; i<p_infos->nb_mult; i++) {
@@ -473,28 +529,3 @@ file_reader_result_t * get_values_from_array(char * content, int size) {
 
     return result;
 }
-
-/*
-file_reader_result_t * file_reader_result = NULL;
-
-    int fd = open("./test_file.txt", O_RDONLY, S_IRUSR | S_IWUSR);
-    struct stat sb;
-
-    if(fstat(fd, &sb) == -1) {
-        perror("couldn't get file size");
-        exit(1);
-    }
-    // On créé un bloc ayant pour taille la taille du fichier.
-    char *file_in_memory = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-
-    // On matche les valeurs du tableau au file_reader_result.
-    file_reader_result = get_values_from_array(file_in_memory, sb.st_size);
-
-
-    munmap(file_in_memory, sb.st_size);
-    for(int i = 0, l = file_reader_result->nb_iterations * 2; i < l; i++) {
-        free(file_reader_result->vecteurs[i]);
-    }
-    free(file_reader_result->vecteurs);
-    free(file_reader_result);
-    */
